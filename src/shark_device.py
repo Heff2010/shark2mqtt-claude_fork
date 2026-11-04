@@ -402,7 +402,13 @@ class SharkVacuum:
             "error_code": self.error_code,
             "error_text": self.error_text,
             "rssi": self.rssi,
-            "operating_mode": self.operating_mode.name if self.operating_mode else "unknown",
+            # STOP is 0, which is falsy, so compare against None rather than
+            # relying on truthiness or STOP would always read "unknown".
+            "operating_mode": (
+                self.operating_mode.name
+                if self.operating_mode is not None
+                else "unknown"
+            ),
             "is_docked": self.is_docked,
             "firmware_version": self.firmware_version,
             "model_number": self.model_number,

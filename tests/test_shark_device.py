@@ -62,6 +62,23 @@ class TestDockedState:
         assert vac.ha_state == "cleaning"
 
 
+class TestOperatingModeAttribute:
+    def test_stop_is_named_not_unknown(self):
+        # OperatingMode.STOP == 0 is falsy; it must still be reported by name.
+        vac = make_vacuum(operating_mode=0, docked_status=0)
+        assert vac.to_attributes_payload()["operating_mode"] == "STOP"
+
+    def test_other_modes_are_named(self):
+        vac = make_vacuum(operating_mode=2)
+        assert vac.to_attributes_payload()["operating_mode"] == "START"
+
+    def test_absent_mode_is_unknown(self):
+        data = make_skegox_device()
+        del data["shadow"]["properties"]["reported"]["Operating_Mode"]
+        vac = SharkVacuum.from_skegox(data)
+        assert vac.to_attributes_payload()["operating_mode"] == "unknown"
+
+
 class TestDockAndMaintenanceProperties:
     def test_defaults_when_absent(self):
         vac = make_vacuum()
