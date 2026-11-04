@@ -9,7 +9,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -22,7 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Publish as ghcr.io/<owner>/shark2mqtt whatever the repository is
+      # called. Image names must be lowercase.
+      - name: Set image name
+        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY_OWNER,,}/shark2mqtt" >> "$GITHUB_ENV"
+
+      # PRs only build amd64 as a check; tags build every platform.
       - name: Set up QEMU
+        if: github.event_name != 'pull_request'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
@@ -41,46 +47,22 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Never move a "latest" tag: users pin an exact version.
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    needs: build-and-push
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Extract version
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Install Pulumi ESC
-        uses: pulumi/esc-action@v1
-
-      - name: Update image tag in ESC
-        run: esc env set home-lab-iac/main pulumiConfig.shark2mqttImageTag "${{ steps.version.outputs.version }}"
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-
-      - name: Trigger deployment
-        run: |
-          curl -fsSL -X POST \
-            -H "Authorization: token $PULUMI_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.pulumi.com/api/stacks/CamSoper-org/home-lab-iac/main/deployments" \
-            -d '{"operation": "update"}'
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
