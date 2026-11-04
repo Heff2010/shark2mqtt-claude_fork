@@ -42,6 +42,7 @@ RUN mkdir -p /opt/browsers \
     && chmod -R o+rX /opt/browsers
 
 COPY --chown=shark:shark src/ ./src/
+COPY --chown=shark:shark LICENSE ./
 
 USER shark
 ENV PYTHONUNBUFFERED=1

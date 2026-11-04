@@ -130,6 +130,13 @@ PROP_GET_SCHEDULE = "GET_Schedule"
 # eco/normal/max scale as Power_Mode — confirmed against the SharkClean
 # app's "Water Flow Level" slider on a RV2820YEUS unit.
 PROP_GET_FLOW_MODE = "GET_Flow_Mode"
+# Extended operating state, a JSON string such as
+# '{"operating_mode":6,"sys_st":6}' (observed on UR2850ZEUS).
+PROP_GET_OPERATING_MODE_EX = "GET_Operating_Mode_Ex"
+# Current clean job: a JSON string with areas_to_clean, cleantype and
+# trigger while a job exists, or the bare string "*" when there is none.
+PROP_GET_AREAS_TO_CLEAN_V3 = "GET_AreasToClean_V3"
+PROP_GET_RECHARGING_TO_RESUME = "GET_RechargingToResume"
 
 # Write properties (used with POST /datapoints.json)
 PROP_SET_OPERATING_MODE = "SET_Operating_Mode"

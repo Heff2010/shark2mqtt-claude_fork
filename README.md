@@ -73,6 +73,8 @@ volumes:
 | `MQTT_PREFIX` | No | `shark2mqtt` | MQTT topic prefix |
 | `POLL_INTERVAL` | No | `300` | Polling interval in seconds |
 | `POLL_INTERVAL_ACTIVE` | No | `20` | Polling interval while cleaning |
+| `PAUSE_OPERATING_MODE` | No | `1` | `Operating_Mode` value sent for pause: `1` or `0`. Some models ignore `1`; `0` is also "stop" on many models, so test it first |
+| `BROWSER_LOGIN` | No | `true` | Set `false` to never launch the automated browser login. A missing or expired token then logs a "Shark login needed" error instead (see [Authentication](#authentication)) |
 | `TOKEN_DIR` | No | `/data` | Directory for persisted auth tokens |
 | `LOG_LEVEL` | No | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 
@@ -105,6 +107,8 @@ Cloudflare's bot detection occasionally flags the automated browser on some host
 2. Copy `shark2mqtt_tokens.json` from that machine's `/data` volume into the `/data` volume on your server.
 
 3. Start the service normally. It will use the saved refresh token and skip the browser flow entirely.
+
+If you always supply tokens this way, set `BROWSER_LOGIN=false` so the service never tries the automated login itself. When the token stops working it logs "Shark login needed" and waits for a new token file instead.
 
 The refresh token is long-lived, so once you have a working `shark2mqtt_tokens.json` the browser flow shouldn't be needed again unless SharkNinja revokes the session (e.g. after a password change).
 
