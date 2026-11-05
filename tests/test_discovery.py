@@ -79,3 +79,70 @@ async def test_new_entities_follow_field_presence(mock_config):
     ids = await discovered_ids(mock_config, vac)
     assert ("shark2mqtt_SND_TEST_sys_st", "sharkvac_sys_st") not in ids
     assert ("shark2mqtt_SND_TEST_job_active", "sharkvac_job_active") in ids
+
+
+@pytest.mark.asyncio
+async def test_entity_id_prefix_gives_separate_ids_and_device(mock_config):
+    mock_config.entity_id_prefix = "claude"
+    mock_config.mqtt_prefix = "claude_shark2mqtt"
+    vac = make_ur2850("docked_idle")
+    client = MqttClient(mock_config)
+    client._publish = AsyncMock()
+    await client.publish_discovery(vac)
+
+    configs = [
+        (call.args[0], call.args[1])
+        for call in client._publish.call_args_list
+        if isinstance(call.args[1], dict) and "unique_id" in call.args[1]
+    ]
+    uid, slug = "claude_shark2mqtt_SND_TEST", "claude_sharkvac"
+    ids = {(p["unique_id"], p["object_id"]) for _, p in configs}
+    room_buttons = {
+        (f"{uid}_clean_{r}", f"{slug}_clean_{r}")
+        for r in ("room_a", "room_b", "room_c", "room_d")
+    }
+    assert ids == (
+        expected(uid, slug, BASE_ENTITIES | ROOM_ENTITIES | MOP_ENTITIES | NEW_JOB_ENTITIES)
+        | room_buttons
+    )
+    for topic, payload in configs:
+        # Discovery topics and the HA device must not overlap the original.
+        assert f"/{uid}" in topic
+        assert payload["device"]["identifiers"] == [uid]
+        assert payload["device"]["name"] == "SharkVac (claude)"
+        assert "claude_shark2mqtt/SND_TEST/" in payload.get(
+            "state_topic", payload.get("command_topic", "claude_shark2mqtt/SND_TEST/")
+        )
+
+
+@pytest.mark.asyncio
+async def test_no_prefix_keeps_original_device(mock_config):
+    mock_config.entity_id_prefix = ""
+    vac = make_ur2850("docked_idle")
+    client = MqttClient(mock_config)
+    client._publish = AsyncMock()
+    await client.publish_discovery(vac)
+    payload = client._publish.call_args_list[0].args[1]
+    assert payload["device"]["identifiers"] == ["shark2mqtt_SND_TEST"]
+    assert payload["device"]["name"] == "SharkVac"
+
+
+def test_prefix_with_default_mqtt_prefix_warns(mock_config, caplog):
+    mock_config.entity_id_prefix = "claude"
+    mock_config.mqtt_prefix = "shark2mqtt"
+    with caplog.at_level("WARNING"):
+        MqttClient(mock_config)
+    assert any("MQTT_PREFIX" in r.message for r in caplog.records)
+
+
+@pytest.mark.parametrize("bad", ["Claude", "has space", "dash-ed"])
+def test_entity_id_prefix_validation(bad):
+    from pydantic import ValidationError
+
+    from src.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None, shark_username="u@example.com", shark_password="p",
+            mqtt_host="localhost", entity_id_prefix=bad,
+        )

@@ -32,6 +32,27 @@ class MqttClient:
         self._water_flow_overrides: dict[str, str] = {}  # device_id -> user-set flow level
         self._published_rooms: dict[str, set[str]] = {}  # device_id -> room slugs
         self._discovery_sigs: dict[str, str] = {}  # device_id -> last published signature
+        if self._id_prefix and self._prefix == "shark2mqtt":
+            logger.warning(
+                "ENTITY_ID_PREFIX is set but MQTT_PREFIX is still the default "
+                "'shark2mqtt'. If another copy of shark2mqtt uses the same "
+                "broker, both will act on each other's commands. Set a "
+                "different MQTT_PREFIX."
+            )
+
+    @property
+    def _id_prefix(self) -> str:
+        """"<prefix>_" when ENTITY_ID_PREFIX is set, else "" (today's IDs)."""
+        prefix = getattr(self._config, "entity_id_prefix", "")
+        return f"{prefix}_" if isinstance(prefix, str) and prefix else ""
+
+    def _device_info(self, device: SharkVacuum) -> dict[str, Any]:
+        """HA device block, kept separate from an unprefixed copy's device."""
+        info = dict(device.device_info)
+        if self._id_prefix:
+            info["identifiers"] = [f"{self._id_prefix}{i}" for i in info["identifiers"]]
+            info["name"] = f"{info['name']} ({self._config.entity_id_prefix})"
+        return info
 
     async def __aenter__(self) -> MqttClient:
         will = aiomqtt.Will(
@@ -69,15 +90,18 @@ class MqttClient:
     async def publish_discovery(self, device: SharkVacuum) -> None:
         """Publish HA MQTT autodiscovery configs for a vacuum and its sensors."""
         dsn = device.dsn
-        uid = f"shark2mqtt_{dsn}"
-        slug = re.sub(r"[^a-z0-9]+", "_", device.product_name.lower()).strip("_")
+        uid = f"{self._id_prefix}shark2mqtt_{dsn}"
+        slug = self._id_prefix + re.sub(
+            r"[^a-z0-9]+", "_", device.product_name.lower()
+        ).strip("_")
+        device_info = self._device_info(device)
 
         # Discovery configs are retained, so republishing every poll cycle
         # is pure noise (issue #29). Skip unless something that feeds the
         # configs (device info or room list) actually changed.
         sig = json.dumps(
             {
-                "device": device.device_info,
+                "device": device_info,
                 "rooms": device.rooms,
                 "has_flow_mode": device.has_flow_mode,
                 "has_sys_st": device.sys_st is not None,
@@ -110,7 +134,7 @@ class MqttClient:
                 "payload_available": "online",
                 "payload_not_available": "offline",
                 "value_template": "{{ value_json.state }}",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -133,7 +157,7 @@ class MqttClient:
                     "availability_topic": f"{self._prefix}/{dsn}/available",
                     "payload_available": "online",
                     "payload_not_available": "offline",
-                    "device": device.device_info,
+                    "device": device_info,
                 },
                 retain=True,
             )
@@ -162,7 +186,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -183,7 +207,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -203,7 +227,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -223,7 +247,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -242,7 +266,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -262,7 +286,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -283,7 +307,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -302,7 +326,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -321,7 +345,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -342,7 +366,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -362,7 +386,7 @@ class MqttClient:
                 "availability_topic": f"{self._prefix}/{dsn}/available",
                 "payload_available": "online",
                 "payload_not_available": "offline",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -383,7 +407,7 @@ class MqttClient:
                     "availability_topic": f"{self._prefix}/{dsn}/available",
                     "payload_available": "online",
                     "payload_not_available": "offline",
-                    "device": device.device_info,
+                    "device": device_info,
                 },
                 retain=True,
             )
@@ -406,7 +430,7 @@ class MqttClient:
                     "availability_topic": f"{self._prefix}/{dsn}/available",
                     "payload_available": "online",
                     "payload_not_available": "offline",
-                    "device": device.device_info,
+                    "device": device_info,
                 },
                 retain=True,
             )
@@ -419,7 +443,7 @@ class MqttClient:
                 "type": "action",
                 "subtype": "error",
                 "topic": f"{self._prefix}/{dsn}/error_event",
-                "device": device.device_info,
+                "device": device_info,
             },
             retain=True,
         )
@@ -442,7 +466,7 @@ class MqttClient:
                         "availability_topic": f"{self._prefix}/{dsn}/available",
                         "payload_available": "online",
                         "payload_not_available": "offline",
-                        "device": device.device_info,
+                        "device": device_info,
                     },
                     retain=True,
                 )
@@ -461,7 +485,7 @@ class MqttClient:
                     "availability_topic": f"{self._prefix}/{dsn}/available",
                     "payload_available": "online",
                     "payload_not_available": "offline",
-                    "device": device.device_info,
+                    "device": device_info,
                 },
                 retain=True,
             )
