@@ -75,6 +75,7 @@ volumes:
 | `POLL_INTERVAL_ACTIVE` | No | `20` | Polling interval while cleaning |
 | `PAUSE_OPERATING_MODE` | No | `1` | `Operating_Mode` value sent for pause: `1` or `0`. Some models ignore `1`; `0` is also "stop" on many models, so test it first |
 | `BROWSER_LOGIN` | No | `true` | Set `false` to never launch the automated browser login. A missing or expired token then logs a "Shark login needed" error instead (see [Authentication](#authentication)) |
+| `ENTITY_ID_PREFIX` | No | | Lowercase prefix for discovery IDs, to run a second copy beside the first. `claude` gives entities like `vacuum.claude_<name>`. Also set a different `MQTT_PREFIX` |
 | `TOKEN_DIR` | No | `/data` | Directory for persisted auth tokens |
 | `LOG_LEVEL` | No | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 

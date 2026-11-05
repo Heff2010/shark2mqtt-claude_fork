@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     # for setups where tokens come from a manual login.
     browser_login: bool = True
 
+    # Prefix for Home Assistant discovery IDs, so a second copy of the
+    # bridge can run beside the first without its entities colliding.
+    # Empty (default) keeps today's IDs: unique_id "shark2mqtt_<dsn>" and
+    # entity IDs such as vacuum.<name>. "claude" gives unique_id
+    # "claude_shark2mqtt_<dsn>" and entity IDs such as vacuum.claude_<name>.
+    # Use a different MQTT_PREFIX as well, or both copies share topics.
+    entity_id_prefix: str = Field(default="", pattern=r"^[a-z0-9_]*$")
+
     # Token persistence
     token_dir: str = "/data"
 
