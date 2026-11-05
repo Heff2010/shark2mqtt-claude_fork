@@ -1,6 +1,8 @@
 services:
   shark2mqtt:
-    image: ghcr.io/camsoper/shark2mqtt:latest
+    # This fork's published image. There is no "latest" tag: pick a version
+    # from https://github.com/users/Heff2010/packages/container/package/shark2mqtt
+    image: ghcr.io/heff2010/shark2mqtt:1.5.5-claude.3
     build: .
     env_file: .env
     volumes:

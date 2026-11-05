@@ -1,13 +1,34 @@
-# shark2mqtt
+# shark2mqtt (Claude fork)
 
 Bridge SharkNinja robot vacuums to [Home Assistant](https://www.home-assistant.io/) via MQTT autodiscovery.
+
+> [!IMPORTANT]
+> **This is a fork.** The original project is [CamSoper/shark2mqtt](https://github.com/CamSoper/shark2mqtt) by [Cam Soper](https://github.com/CamSoper), and nearly all of the code and the rest of this README are his work (MIT licence). This fork adds fixes found on a Shark **UR2850ZEUS** (vacuum + mop with a self-empty, self-fill dock). It is published so that the [Claude Shark2MQTT Home Assistant app](https://github.com/Heff2010/shark2mqtt-addon-claude_fork) can use it.
+
+## What this fork changes, and why
+
+The original bridge works on many Shark models, but on the UR2850ZEUS several things were wrong. This fork fixes them. Each change only switches on when the robot reports the data it needs, so other models should behave as they do with the original.
+
+| Change | Why |
+|---|---|
+| **Configurable pause value** (`PAUSE_OPERATING_MODE`) | The UR2850 ignores the standard pause command (`1`). Sending `0` pauses it. |
+| **Correct paused, docked and cleaning states** | The UR2850 reports a system status code and a clean job. The bridge now uses them, so Home Assistant shows Paused, Returning and Docked correctly, shows Docked while the robot empties its bin mid-job, and shows Cleaning for runs started from the Shark app or a Shark schedule. |
+| **Faster updates during a job** | Fast polling starts as soon as a clean job exists, not only once the robot is moving. |
+| **New diagnostic entities** | **System Status Code** and **Job Active**, on models that report them. |
+| **Token login** (`BROWSER_LOGIN=false`) | The automated browser login fails on many setups and repeated failures can lock the Shark account. With it off, you log in yourself in a normal browser and give the bridge the token file. |
+| **Side by side mode** (`ENTITY_ID_PREFIX`) | Lets this fork run next to the original during testing, with its own entities and MQTT topics. |
+| **Stop no longer crashes** | Stop failed when the robot's mode was unknown. |
+
+Saving the log to daily files is a feature of the [Home Assistant app](https://github.com/Heff2010/shark2mqtt-addon-claude_fork), not of this bridge.
+
+**Where to report problems:** problems with this fork's changes go to [this repository's issues](https://github.com/Heff2010/shark2mqtt-claude_fork/issues). Issue and pull request numbers further down this README (such as #38) refer to the [original project](https://github.com/CamSoper/shark2mqtt/issues).
 
 > [!NOTE]
 > **EU region support:** Set `SHARK_REGION=eu` to use with EU Shark accounts. Thanks to [@hjennerway](https://github.com/hjennerway) for capturing the EU API traffic that made this possible.
 
 ## Confirmed Working Models
 
-A growing list of models confirmed working in the wild lives in [CONFIRMED_MODELS.md](CONFIRMED_MODELS.md). Other SharkNinja robot vacuums likely work too -- the list reflects what's been reported, not the limit of what's supported. If your model isn't on it, please let me know.
+A growing list of models confirmed working in the wild lives in [CONFIRMED_MODELS.md](CONFIRMED_MODELS.md). That list comes from the original project and was reported against the original bridge. Other SharkNinja robot vacuums likely work too -- the list reflects what's been reported, not the limit of what's supported.
 
 ## Quick Start
 
@@ -24,15 +45,19 @@ A growing list of models confirmed working in the wild lives in [CONFIRMED_MODEL
    docker compose up -d
    ```
 
-## Home Assistant OS Add-on
+   This uses the pre-built image of this fork (see [Pre-built Image](#pre-built-image)). To build it yourself from this folder instead, run `docker compose up -d --build`.
 
-Running HAOS? [@400HPMustang](https://github.com/400HPMustang) built an HA add-on that wraps shark2mqtt: **[400HPMustang/shark2mqtt-addon](https://github.com/400HPMustang/shark2mqtt-addon)**. Install it from the HA Add-on Store -- no Docker setup needed.
+## Home Assistant OS App (Add-on)
 
-The add-on is maintained separately. File add-on-specific issues on that repo; shark2mqtt issues stay here.
+Running HAOS? Use **[Heff2010/shark2mqtt-addon-claude_fork](https://github.com/Heff2010/shark2mqtt-addon-claude_fork)**. It installs **Claude Shark2MQTT**, which runs this fork's bridge, from the Home Assistant app store (called the add-on store in older versions). No Docker setup needed.
+
+It is itself a fork of the original add-on by [@400HPMustang](https://github.com/400HPMustang), **[400HPMustang/shark2mqtt-addon](https://github.com/400HPMustang/shark2mqtt-addon)**, which runs the *original* bridge without this fork's changes.
 
 ## Pre-built Image
 
-A pre-built image is available from GitHub Container Registry:
+A pre-built image of this fork is published, free and public, in GitHub's container registry: [`ghcr.io/heff2010/shark2mqtt`](https://github.com/users/Heff2010/packages/container/package/shark2mqtt). It is built for `amd64` and `arm64`.
+
+There is **no `latest` tag**, on purpose: pick an exact version so an update never arrives by surprise. The current version is `1.5.5-claude.3`. All versions are listed on the [package page](https://github.com/users/Heff2010/packages/container/package/shark2mqtt).
 
 ```bash
 docker run -d \
@@ -40,7 +65,7 @@ docker run -d \
   --env-file .env \
   -v shark2mqtt_data:/data \
   --restart unless-stopped \
-  ghcr.io/camsoper/shark2mqtt:latest
+  ghcr.io/heff2010/shark2mqtt:1.5.5-claude.3
 ```
 
 Or with Docker Compose (no `build` needed):
@@ -48,7 +73,7 @@ Or with Docker Compose (no `build` needed):
 ```yaml
 services:
   shark2mqtt:
-    image: ghcr.io/camsoper/shark2mqtt:latest
+    image: ghcr.io/heff2010/shark2mqtt:1.5.5-claude.3
     env_file: .env
     volumes:
       - shark2mqtt_data:/data
@@ -57,6 +82,8 @@ services:
 volumes:
   shark2mqtt_data:
 ```
+
+The original, unmodified bridge is published separately by its author as `ghcr.io/camsoper/shark2mqtt`. It does not include this fork's changes.
 
 ## Configuration
 
@@ -109,6 +136,8 @@ Cloudflare's bot detection occasionally flags the automated browser on some host
 
 3. Start the service normally. It will use the saved refresh token and skip the browser flow entirely.
 
+Another way to get the token file, without Docker on a second machine, is the **Shark Token Saver** Firefox extension in this fork's Home Assistant app repository ([tools/firefox-token-saver](https://github.com/Heff2010/shark2mqtt-addon-claude_fork/tree/main/tools/firefox-token-saver)). You log in to Shark yourself in Firefox and it saves `shark2mqtt_tokens.json`.
+
 If you always supply tokens this way, set `BROWSER_LOGIN=false` so the service never tries the automated login itself. When the token stops working it logs "Shark login needed" and waits for a new token file instead.
 
 The refresh token is long-lived, so once you have a working `shark2mqtt_tokens.json` the browser flow shouldn't be needed again unless SharkNinja revokes the session (e.g. after a password change).
@@ -153,6 +182,8 @@ Each vacuum is automatically discovered by Home Assistant with the following ent
 | `button.<name>_clean_<room>` | Button | One-tap room cleaning (one per room) |
 | `select.<name>_clean_mode` | Select | Normal or Matrix (double-pass) cleaning mode |
 | `select.<name>_water_flow` | Select | Mop water flow level (vac+mop models only) |
+| `sensor.<name>_sys_st` | Sensor | System Status Code, the robot's raw status number (models that report it, such as the UR2850) |
+| `binary_sensor.<name>_job_active` | Binary Sensor | On while a clean job is assigned (models that report it, such as the UR2850) |
 
 Room buttons and the clean mode select appear automatically when room data is available from the Shark cloud. The water flow select appears only on models that report `Flow_Mode` -- i.e. those with a mop tank -- so vacuum-only models won't get a control their hardware ignores.
 
@@ -234,6 +265,8 @@ data:
 
 ## Contributing
 
+The text below is the original author's, about the original project. For this fork, open an issue or pull request on [this repository](https://github.com/Heff2010/shark2mqtt-claude_fork).
+
 This project scratches a personal itch — I'm sharing it in case it helps others, not looking to take on a maintenance burden. If something doesn't work for you, please submit a **pull request** rather than an issue. I only own two vacuum models, so I can't test or troubleshoot devices I don't have. PRs with fixes or support for additional models are welcome; issues requesting changes are likely to be closed.
 
 ### Capturing a shadow dump
@@ -256,6 +289,8 @@ Two things worth knowing:
 
 ## Acknowledgements
 
+This fork exists thanks to [Cam Soper](https://github.com/CamSoper), who wrote shark2mqtt, and [@400HPMustang](https://github.com/400HPMustang), who wrote the Home Assistant add-on it builds on. The thanks below are Cam's, from the original project; issue numbers refer to that project.
+
 Big thanks to the folks who've made this project better than I could've made it alone:
 
 - [@hjennerway](https://github.com/hjennerway) -- captured the EU API traffic that made EU region support possible.
@@ -269,8 +304,8 @@ Big thanks to the folks who've made this project better than I could've made it 
 ## Building from Source
 
 ```bash
-git clone https://github.com/CamSoper/shark2mqtt.git
-cd shark2mqtt
+git clone https://github.com/Heff2010/shark2mqtt-claude_fork.git
+cd shark2mqtt-claude_fork
 docker build -t shark2mqtt .
 ```
 

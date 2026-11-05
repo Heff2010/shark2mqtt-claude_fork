@@ -23,8 +23,8 @@ Standalone Python service bridging SharkNinja robot vacuums to Home Assistant vi
 
 ## Releases
 
-Local git tags may be stale. When tagging a release, always check GitHub for the latest tag (e.g., `gh api repos/CamSoper/shark2mqtt/tags --jq '.[0].name'`) before determining the next version number.
+This is a fork of `CamSoper/shark2mqtt`. Its releases are tagged `v<upstream version>-claude.<n>` (for example `v1.5.5-claude.3`) and publish `ghcr.io/heff2010/shark2mqtt:<version>`, with no `latest` tag. Local git tags may be stale: check the fork's tags on GitHub (`Heff2010/shark2mqtt-claude_fork`) before picking the next number. Never tag or release without the owner's explicit OK.
 
 ## If Message Signing Starts Being Enforced
 
-`@CamSoper` has notes. Ask him for them.
+`@CamSoper` (the original author) has notes.
