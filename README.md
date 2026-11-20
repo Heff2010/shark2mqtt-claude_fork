@@ -14,6 +14,7 @@ The original bridge works on many Shark models, but on the UR2850ZEUS several th
 | **Configurable pause value** (`PAUSE_OPERATING_MODE`) | The UR2850 ignores the standard pause command (`1`). Sending `0` pauses it. |
 | **Correct paused, docked and cleaning states** | The UR2850 reports a system status code and a clean job. The bridge now uses them, so Home Assistant shows Paused, Returning and Docked correctly, shows Docked while the robot empties its bin mid-job, and shows Cleaning for runs started from the Shark app or a Shark schedule. |
 | **Faster updates during a job** | Fast polling starts as soon as a clean job exists, not only once the robot is moving. |
+| **Deep runs** | The Deep button's vacuum-then-mop run sets no clean job, so the bridge reads it from `CleaningParameters` instead. A stop mid-run shows Paused, not Idle, and polling stays fast while the robot is on the dock between passes. |
 | **New diagnostic entities** | **System Status Code** and **Job Active**, on models that report them. |
 | **Token login** (`BROWSER_LOGIN=false`) | The automated browser login fails on many setups and repeated failures can lock the Shark account. With it off, you log in yourself in a normal browser and give the bridge the token file. |
 | **Side by side mode** (`ENTITY_ID_PREFIX`) | Lets this fork run next to the original during testing, with its own entities and MQTT topics. |

@@ -139,6 +139,49 @@ def ur2850_raw(state: str, **overrides: Any) -> dict[str, Any]:
     }
 
 
+def _cp(stage: int, *, wet: int, dry: int, deep: int) -> str:
+    return json.dumps(
+        {"CleanStage": stage, "Wet": wet, "Dry": dry, "Deep": deep}, separators=(",", ":"),
+    )
+
+
+# REAL 2026-11-20, a Deep run (HA's Deep button, Operating_Mode 8). Deep sets
+# no job: AreasToClean_V3 stays "*" for the whole run.
+SAMPLES.update({
+    # 12:39:42, dry pass.
+    "deep_dry_pass": {
+        **_sample(mode=8, sys_st=6, job="*", docked=False, charging=False,
+                  mission_complete=False),
+        "CleaningParameters": _cp(2, wet=0, dry=1, deep=1),
+    },
+    # 12:46:51, back on the dock between the dry and wet passes.
+    "deep_between_passes": {
+        **_sample(mode=3, sys_st=32, job="*", docked=False, charging=False,
+                  mission_complete=False, power_mode=2),
+        "CleaningParameters": _cp(2, wet=0, dry=1, deep=1),
+    },
+    # 12:51:52, stopped at the start of the wet pass (warning 29, stuck).
+    # v1.5.5-claude.4 showed idle.
+    "deep_paused": {
+        **_sample(mode=0, sys_st=4, job="*", docked=False, charging=False,
+                  mission_complete=False),
+        "CleaningParameters": _cp(2, wet=1, dry=0, deep=1),
+        "Warning_Code": 29,
+    },
+    # 13:35:45, on the dock washing after the wet pass.
+    "deep_finished_on_dock": {
+        **_sample(mode=3, sys_st=32, job="*", docked=False, charging=False,
+                  mission_complete=False, power_mode=2),
+        "CleaningParameters": _cp(2, wet=1, dry=0, deep=1),
+    },
+    # 13:40:45, run over.
+    "deep_over": {
+        **_sample(mode=3, sys_st=13, job="*", docked=True, charging=True),
+        "CleaningParameters": _cp(3, wet=1, dry=0, deep=0),
+    },
+})
+
+
 def make_ur2850(state: str, **overrides: Any) -> SharkVacuum:
     """Build a SharkVacuum from a named sample."""
     return SharkVacuum.from_skegox(ur2850_raw(state, **overrides))
