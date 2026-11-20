@@ -54,6 +54,7 @@ def _sample(
         "Evacuating": evacuating,
         "Flow_Mode": flow_mode,
         "MissionComplete": mission_complete,
+        "MopPlateAttached": True,
         "Operating_Mode": mode,
         "Operating_Mode_Ex": _ex(mode, sys_st),
         "Power_Mode": power_mode,

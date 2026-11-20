@@ -146,3 +146,33 @@ def test_entity_id_prefix_validation(bad):
             _env_file=None, shark_username="u@example.com", shark_password="p",
             mqtt_host="localhost", entity_id_prefix=bad,
         )
+
+
+@pytest.mark.asyncio
+async def test_entity_id_prefix_covers_upstream_entities(mock_config):
+    # Dock tank sensors, the deep clean button and the floor plan came from
+    # upstream after ENTITY_ID_PREFIX was added; they must be prefixed too.
+    mock_config.entity_id_prefix = "claude"
+    mock_config.mqtt_prefix = "claude_shark2mqtt"
+    vac = make_ur2850(
+        "docked_idle",
+        DockSensorData='{"CleanTank":{"Install":1,"Empty":0},"GreyTank":{"Install":1,"Full":0}}',
+        CleaningParameters="{}",
+    )
+    client = MqttClient(mock_config)
+    client._publish = AsyncMock()
+    await client.publish_discovery(vac)
+    await client.publish_map(vac, "<svg/>")
+
+    uid = "claude_shark2mqtt_SND_TEST"
+    configs = [
+        call.args[1] for call in client._publish.call_args_list
+        if isinstance(call.args[1], dict) and "unique_id" in call.args[1]
+    ]
+    uids = {p["unique_id"] for p in configs}
+    for suffix in ("_clean_tank_empty", "_dirty_tank_full", "_deep", "_map"):
+        assert uid + suffix in uids
+    for p in configs:
+        assert p["unique_id"].startswith("claude_")
+        assert p["object_id"].startswith("claude_")
+        assert p["device"]["identifiers"] == [uid]
