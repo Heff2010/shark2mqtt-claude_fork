@@ -186,3 +186,16 @@ async def test_legacy_docked_polls_slow(
         monkeypatch, make_skegox_device(operating_mode=0),
     )
     assert interval == mock_config.poll_interval
+
+
+@pytest.mark.asyncio
+async def test_deep_run_on_dock_polls_fast(
+    mock_api, mock_ayla_api, mock_mqtt, mock_auth, mock_config, command_event, monkeypatch,
+):
+    """Between a Deep run's passes the state is docked, but polling stays fast."""
+    assert SharkVacuum.from_skegox(ur2850_raw("deep_between_passes")).ha_state == "docked"
+    interval = await _first_interval(
+        mock_api, mock_ayla_api, mock_mqtt, mock_auth, mock_config, command_event,
+        monkeypatch, ur2850_raw("deep_between_passes"),
+    )
+    assert interval == mock_config.poll_interval_active

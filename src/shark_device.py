@@ -318,6 +318,10 @@ class SharkVacuum:
             return "returning"
         if sys_st in (SYS_ST_DOCKED, SYS_ST_DOCK_ACTIVITY):
             return "docked"
+        # A Deep run (Operating_Mode 8) sets no job, so without this a pause
+        # or a stuck robot mid-Deep read "idle" (mode 0).
+        if sys_st == SYS_ST_PAUSED and self.deep_run_active:
+            return "paused"
         return None
 
     @property
@@ -550,6 +554,25 @@ class SharkVacuum:
         job = self._job
         val = job.get("trigger") if job else None
         return val if isinstance(val, str) else None
+
+    @property
+    def deep_run_active(self) -> bool:
+        """Whether a Deep (vacuum then mop) run is under way.
+
+        Deep runs leave AreasToClean_V3 at "*", so the job can't show them.
+        On UR2850ZEUS, CleaningParameters reports Deep 1 with CleanStage 1
+        (starting) or 2 (running, including the dock stop between passes),
+        and CleanStage 3 with Deep 0 once the run is over.
+        """
+        params = self._get_json_dict_prop(PROP_GET_CLEANING_PARAMETERS)
+        if not params:
+            return False
+        return params.get("Deep") == 1 and params.get("CleanStage") in (1, 2)
+
+    @property
+    def run_active(self) -> bool:
+        """A job or a Deep run is under way: keeps fast polling on."""
+        return bool(self.job_active) or (self.uses_job_state and self.deep_run_active)
 
     @property
     def uses_job_state(self) -> bool:

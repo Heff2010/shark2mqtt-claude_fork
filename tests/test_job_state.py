@@ -228,3 +228,42 @@ def test_real_wet_run_from_app():
     assert vac.fan_speed == "max"
     assert vac.water_flow == "normal"
     assert vac.to_attributes_payload()["operating_mode"] == "MOP"
+
+
+class TestDeepRun:
+    """Deep (vacuum then mop) runs set no job; CleaningParameters shows them."""
+
+    @pytest.mark.parametrize("state,expected", [
+        ("deep_dry_pass", "cleaning"),
+        ("deep_between_passes", "docked"),
+        ("deep_paused", "paused"),
+        ("deep_finished_on_dock", "docked"),
+        ("deep_over", "docked"),
+    ])
+    def test_states(self, state, expected):
+        assert make_ur2850(state).ha_state == expected
+
+    @pytest.mark.parametrize("state,active", [
+        ("deep_dry_pass", True),
+        ("deep_between_passes", True),
+        ("deep_paused", True),
+        ("deep_finished_on_dock", True),
+        ("deep_over", False),
+        ("docked_idle", False),
+    ])
+    def test_run_active(self, state, active):
+        vac = make_ur2850(state)
+        assert vac.run_active is active
+        # The job sensor still reflects AreasToClean_V3 only.
+        assert vac.job_active is False
+
+    def test_sys_st_4_without_deep_keeps_old_mapping(self):
+        vac = make_ur2850("deep_paused", CleaningParameters='{"CleanStage":3,"Wet":0,"Dry":1,"Deep":0}')
+        assert vac.ha_state == "idle"
+        assert vac.run_active is False
+
+    def test_needs_job_fields(self):
+        # Without the job fields the new rule is off, as for other models.
+        vac = make_ur2850("deep_paused", AreasToClean_V3=None)
+        assert vac.ha_state == "idle"
+        assert vac.run_active is False
