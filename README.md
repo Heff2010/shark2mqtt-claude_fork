@@ -181,7 +181,7 @@ Cloudflare's bot detection occasionally flags the automated browser on some host
 
 3. Start the service normally. It will use the saved refresh token and skip the browser flow entirely.
 
-Another way to get the token file, without Docker on a second machine, is the **Shark Token Saver** Firefox extension in this fork's Home Assistant app repository ([tools/firefox-token-saver](https://github.com/Heff2010/shark2mqtt-addon-claude_fork/tree/main/tools/firefox-token-saver)). You log in to Shark yourself in Firefox and it saves `shark2mqtt_tokens.json`.
+Another way to get the token file, without Docker on a second machine, is the **Shark Token Saver** Firefox extension ([Heff2010/shark-token-saver](https://github.com/Heff2010/shark-token-saver)). You log in to Shark yourself in Firefox and it saves `shark2mqtt_tokens.json`.
 
 If you always supply tokens this way, set `BROWSER_LOGIN=false` so the service never tries the automated login itself. When the token stops working it logs "Shark login needed" and waits for a new token file instead.
 
