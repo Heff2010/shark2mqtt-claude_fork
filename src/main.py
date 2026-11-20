@@ -14,6 +14,7 @@ import aiomqtt
 from .ayla_api import AylaApi, MardData, debug_dump_mard_structure, parse_mard
 from .config import Settings
 from .exc import SharkAuthError
+from .map_render import render_map_svg
 from .mqtt_client import MqttClient
 from .shark_auth import SharkAuth
 from .shark_device import SharkVacuum
@@ -110,6 +111,77 @@ async def _fetch_skegox_mard(
     return parse_mard(body, product_name, dsn, source="Skegox MARD")
 
 
+async def _publish_floor_plan(
+    mqtt: MqttClient,
+    config: Settings,
+    device: SharkVacuum,
+    mard: MardData | None,
+    rendered: dict[str, bytes],
+) -> None:
+    """Render the device's MARD as a floor plan and publish it, once per file.
+
+    Never raises: a plan that can't be drawn is logged and skipped so it can
+    never interrupt polling.
+    """
+    if not config.map_image or mard is None or not isinstance(mard.raw, bytes):
+        return
+    if rendered.get(device.dsn) is mard.raw:
+        return  # this exact file was already rendered this session
+    rendered[device.dsn] = mard.raw
+    try:
+        svg = render_map_svg(mard.raw, show_scan=config.map_show_scan)
+        if svg:
+            await mqtt.publish_map(device, svg)
+        else:
+            logger.debug("No rooms with outlines in MARD for %s", device.product_name)
+    except Exception:
+        logger.warning("Could not publish floor plan for %s", device.product_name, exc_info=True)
+
+
+def _ayla_snd(device: SharkVacuum) -> str:
+    """The skegox device ID an Ayla robot migrated to, from its battery serial.
+
+    GET_Battery_Serial_Num looks like "<prefix>-<snd>". It can be missing or
+    present with a None value (issue #46), so both read as no match.
+    """
+    bsn = device._properties.get("GET_Battery_Serial_Num") or ""
+    return bsn.split("-")[-1] if "-" in bsn else ""
+
+
+def _ayla_only_devices(
+    ayla_devices: list[SharkVacuum], skegox_snds: set[str], *, log: bool = False,
+) -> list[SharkVacuum]:
+    """Ayla robots that skegox doesn't already report (AYLA_MERGE).
+
+    Migrated robots usually keep a stale Ayla record, so a robot is skipped
+    when its battery serial maps to a skegox device, and also when Ayla
+    reports it offline (migrated robots read Offline there, issue #48).
+    Without both checks, those stale records would show up in Home
+    Assistant as duplicate vacuums.
+    """
+    kept = []
+    for device in ayla_devices:
+        snd = _ayla_snd(device)
+        if device.dsn in skegox_snds or (snd and snd in skegox_snds):
+            reason = "already on skegox"
+        elif not device.is_online:
+            reason = "offline on Ayla"
+        else:
+            kept.append(device)
+            if log:
+                logger.info(
+                    "AYLA_MERGE: adding Ayla-only robot %s (%s)",
+                    device.product_name, device.dsn,
+                )
+            continue
+        if log:
+            logger.info(
+                "AYLA_MERGE: skipping Ayla robot %s (%s): %s",
+                device.product_name, device.dsn, reason,
+            )
+    return kept
+
+
 async def poll_loop(
     api: SkegoxApi,
     ayla_api: AylaApi,
@@ -128,6 +200,8 @@ async def poll_loop(
     # only changes on room edits/map saves, not per poll, so re-fetching
     # every cycle would waste API calls and S3 presigned URLs.
     skegox_mard_cache: dict[str, MardData] = {}
+    # MARD file last rendered per device, so the plan is drawn once per file.
+    rendered_maps: dict[str, bytes] = {}
 
     while True:
         any_active = False
@@ -196,6 +270,11 @@ async def poll_loop(
                 skegox_snds.add(device.dsn)
                 devices_map[device.dsn] = device
                 await mqtt.publish_discovery(device)
+                # Floor plan from whichever MARD supplied the rooms.
+                await _publish_floor_plan(
+                    mqtt, config, device,
+                    skegox_mard if skegox_mard.rooms else ayla, rendered_maps,
+                )
                 await mqtt.publish_state(device, prev_error=prev_errors)
                 prev_errors[device.dsn] = device.error_code
                 if device.ha_state != "docked" or device.job_active:
@@ -211,13 +290,20 @@ async def poll_loop(
                     "Skegox returned %d device(s): %s",
                     len(skegox_snds), skegox_names or "(none)",
                 )
-            if skegox_snds:
+            if skegox_snds and not config.ayla_merge:
                 if first_poll:
                     logger.info("Using skegox API, skipping Ayla")
             else:
                 try:
                     ayla_devices = await ayla_api.get_devices()
-                    if first_poll:
+                    if skegox_snds:
+                        # AYLA_MERGE (issue #46): a half-migrated account
+                        # has robots on both backends. Add only the Ayla
+                        # robots that skegox doesn't already cover.
+                        ayla_devices = _ayla_only_devices(
+                            ayla_devices, skegox_snds, log=first_poll,
+                        )
+                    elif first_poll:
                         ayla_names = [d.product_name for d in ayla_devices]
                         logger.info(
                             "Falling back to Ayla, found %d device(s): %s",
@@ -320,7 +406,8 @@ async def run(config: Settings) -> None:
         try:
             ayla_vacuums = await ayla_api.get_devices()
             for v in ayla_vacuums:
-                bsn = v._properties.get("GET_Battery_Serial_Num", "")
+                # The property can be present with a None value (seen on an RV2820ZEUS).
+                bsn = v._properties.get("GET_Battery_Serial_Num") or ""
                 snd = bsn.split("-")[-1] if "-" in bsn else ""
                 if snd and v.rooms:
                     ayla_room_data[snd] = (v.floor_id, v.rooms)
